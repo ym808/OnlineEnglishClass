@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  student
+  instructor
+  admin
+}
+
+enum UserStatus {
+  active
+  pending
+  suspended
+}
+
+enum AgeGroup {
+  s10s  @map("10s")
+  s20s  @map("20s")
+  s30s  @map("30s")
+  s40s  @map("40s")
+  s50plus @map("50plus")
+}
+
+enum EnglishLevel {
+  beginner
+  intermediate
+  advanced
+}
+
+enum TimeSlot {
+  morning
+  afternoon
+  evening
+}
+
+enum LessonStatus {
+  pending
+  confirmed
+  completed
+  cancelled
+}
+
+model User {
+  id        String     @id @db.Uuid
+  email     String     @unique
+  name      String     @db.VarChar(50)
+  role      Role
+  phone     String?
+  status    UserStatus @default(active)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  studentProfile    StudentProfile?
+  instructorProfile InstructorProfile?
+  lessonsAsStudent  Lesson[]  @relation("StudentLessons")
+  lessonsAsInstructor Lesson[] @relation("InstructorLessons")
+  inviteTokens      InviteToken[]
+
+  @@map("users")
+}
+
+model StudentProfile {
+  id              String       @id @default(uuid()) @db.Uuid
+  userId          String       @unique @db.Uuid @map("user_id")
+  ageGroup        AgeGroup     @map("age_group")
+  englishLevel    EnglishLevel @map("english_level")
+  learningPurpose String[]     @map("learning_purpose")
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("student_profiles")
+}
+
+model InstructorProfile {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @unique @db.Uuid @map("user_id")
+  nationality     String   @db.VarChar(50)
+  nativeLanguage  String   @db.VarChar(50) @map("native_language")
+  experienceYears Int      @map("experience_years")
+  specialties     String[]
+  bio             String   @db.VarChar(1000)
+  profileImageUrl String?  @map("profile_image_url")
+  inviteTokenId   String   @unique @db.Uuid @map("invite_token_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inviteToken InviteToken @relation(fields: [inviteTokenId], references: [id])
+
+  @@map("instructor_profiles")
+}
+
+model Lesson {
+  id               String       @id @default(uuid()) @db.Uuid
+  studentId        String       @db.Uuid @map("student_id")
+  instructorId     String?      @db.Uuid @map("instructor_id")
+  preferredDate    DateTime     @map("preferred_date") @db.Date
+  preferredTimeSlot TimeSlot   @map("preferred_time_slot")
+  durationMinutes  Int          @map("duration_minutes")
+  englishLevel     EnglishLevel @map("english_level")
+  learningGoal     String       @db.VarChar(500) @map("learning_goal")
+  specialRequests  String?      @db.VarChar(200) @map("special_requests")
+  confirmedAt      DateTime?    @map("confirmed_at")
+  teamsMeetingUrl  String?      @map("teams_meeting_url")
+  teamsMeetingId   String?      @map("teams_meeting_id")
+  status           LessonStatus @default(pending)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  student    User  @relation("StudentLessons", fields: [studentId], references: [id])
+  instructor User? @relation("InstructorLessons", fields: [instructorId], references: [id])
+
+  @@map("lessons")
+}
+
+model InviteToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  token     String    @unique
+  createdBy String    @db.Uuid @map("created_by")
+  usedAt    DateTime? @map("used_at")
+  expiresAt DateTime  @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  creator            User               @relation(fields: [createdBy], references: [id])
+  instructorProfile  InstructorProfile?
+
+  @@map("invite_tokens")
+}
